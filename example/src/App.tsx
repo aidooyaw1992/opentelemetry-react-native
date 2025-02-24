@@ -4,7 +4,7 @@ import { OtelWrapper } from '../../src/OtelWrapper';
 import { context, trace } from '@opentelemetry/api';
 
 const RumConfig: ReactNativeConfiguration = {
-  beaconEndpoint: 'https://otelcol.dev.mymtnlite.com.gh/v1/traces',
+  beaconEndpoint: '',
   // beaconEndpoint: 'http://10.0.2.2:4318/v1/traces',
   applicationName: 'mtn-app',
   allowInsecureBeacon: true,
@@ -63,7 +63,6 @@ export default function App() {
           title="Go to Details Screen"
           accessibilityLabel="goToDetailScreen"
           testID="goToDetailScreen"
-          onPress={() => {}}
         />
         <Button title="Nested fetch custom span" onPress={createSpan} />
         <Button

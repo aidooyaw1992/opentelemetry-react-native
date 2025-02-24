@@ -3,7 +3,6 @@
   "version": "0.1.1",
   "description": "opentelemetry for react native",
   "source": "./src/index.tsx",
-  "private": false,
   "main": "./lib/commonjs/index.js",
   "module": "./lib/module/index.js",
   "exports": {
