@@ -6,7 +6,7 @@ import { context, trace } from '@opentelemetry/api';
 const RumConfig: ReactNativeConfiguration = {
   beaconEndpoint: '',
   // beaconEndpoint: 'http://10.0.2.2:4318/v1/traces',
-  applicationName: 'mtn-app',
+  applicationName: 'app',
   allowInsecureBeacon: true,
   developmentEnvironment: 'local-development',
   debug: true,
@@ -14,7 +14,7 @@ const RumConfig: ReactNativeConfiguration = {
     'app.version': '1.1.5',
     'globalAttr1': '42',
     'globalAttr2': 42,
-    'service.name': 'my-mtn-app',
+    'service.name': 'my-app',
   },
 };
 export default function App() {

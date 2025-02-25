@@ -33,7 +33,7 @@ export default class NativeSpanExporter implements SpanExporter {
       parentSpanId: span.parentSpanId,
       attributes: span.attributes,
       resource: {
-        'service.name': 'my-mtn-app',
+        'service.name': 'my- app',
       },
       ...spanContext,
     };

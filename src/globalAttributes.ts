@@ -18,8 +18,8 @@ export function getResource(): ResourceAttributes {
     [ATTR_TELEMETRY_SDK_NAME]: 'otlp',
     [ATTR_TELEMETRY_SDK_VERSION]: VERSION,
     // Splunk specific attributes
-    'mtn-otel.rumVersion': VERSION,
-    'service.name': 'my-mtn-app',
+    ' otel.rumVersion': VERSION,
+    'service.name': 'my- app',
   };
 
   if (Platform.OS === 'ios') {

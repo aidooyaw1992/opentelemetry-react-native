@@ -37,7 +37,7 @@ class ActivityCallbacks: Application.ActivityLifecycleCallbacks {
 
   override fun onActivityResumed(activity: Activity) {
     val simpleName = activity::class.java.simpleName
-    Log.d("MTN-OTEL", "onActivityResumed: $simpleName")
+    Log.d("OTEL", "onActivityResumed: $simpleName")
   }
 
   override fun onActivityPaused(p0: Activity) {
