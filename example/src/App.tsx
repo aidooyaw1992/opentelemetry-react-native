@@ -4,8 +4,8 @@ import { OtelWrapper } from '../../src/OtelWrapper';
 import { context, trace } from '@opentelemetry/api';
 
 const RumConfig: ReactNativeConfiguration = {
-  beaconEndpoint: '',
-  // beaconEndpoint: 'http://10.0.2.2:4318/v1/traces',
+  beaconEndpoint: 'https://otelcol.dev.mymtnlite.com.gh/v1/traces',
+  // token: 'Z0ZLU3VKVUJNeV81cTF4cS00MnQ6SVAwRDhVYUdDT0NzRFVxMG02YjZRUQ==',
   applicationName: 'app',
   allowInsecureBeacon: true,
   developmentEnvironment: 'local-development',

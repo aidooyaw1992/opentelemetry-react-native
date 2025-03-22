@@ -28,9 +28,11 @@ import {
 import NativeSpanExporter from './exporting';
 import { getResource } from './globalAttributes';
 import { _generatenewSessionId, getSessionId } from './session';
+import { Resource } from '@opentelemetry/resources';
 
 export interface ReactNativeConfiguration {
   beaconEndpoint?: string;
+  token?: string;
   applicationName: string;
   developmentEnvironment: string;
   debug?: boolean;
@@ -121,6 +123,7 @@ export const Rum: RumType = {
       }
 
       nativeSdkConf.beaconEndpoint = config.beaconEndpoint;
+      nativeSdkConf.rumAccessToken = config.token;
     }
 
     const sessionId = getSessionId();
@@ -142,15 +145,20 @@ export const Rum: RumType = {
 
     // make sure native crashreporter has correct attributes
     // setGlobalAttributes(nativeSdkConf.globalAttributes);
+    const resource = new Resource({});
+    const provider = new WebTracerProvider({ resource });
 
-    const provider = new WebTracerProvider({
-      spanProcessors: [
-        new SimpleSpanProcessor(new ConsoleSpanExporter()),
-        new BatchSpanProcessor(new NativeSpanExporter()),
-      ],
-    });
+    provider.addSpanProcessor(
+      new BatchSpanProcessor(new NativeSpanExporter(), {
+        scheduledDelayMillis: config.bufferTimeout ?? 3000,
+        maxExportBatchSize: config.bufferSize ?? 20,
+      })
+    );
+    provider.addSpanProcessor(
+      new SimpleSpanProcessor(new ConsoleSpanExporter())
+    );
+    provider.register({});
 
-    provider.register();
     this.provider = provider;
 
     const clientInitEnd = Date.now();

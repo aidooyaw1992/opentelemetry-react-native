@@ -52,6 +52,7 @@ class RNOpentelemetryModule(reactContext: ReactApplicationContext) :
       val mapReader = ConfigMapReader(configMap)
       val beaconEndpoint = mapReader.getBeaconEndpoint()
       val resourceMap = mapReader.getResource()
+      val token = mapReader.getRumAccessToken()
 
       val resource = if (resourceMap == null) {
         Resource.getDefault()
@@ -68,6 +69,7 @@ class RNOpentelemetryModule(reactContext: ReactApplicationContext) :
 
         // Add device attributes
         resourceAttributesBuilder
+          .put("service.name", "mymtn-app")
           .put("device.model", Build.MODEL)
           .put("device.manufacturer", Build.MANUFACTURER)
           .put("package.name", BuildConfig.LIBRARY_PACKAGE_NAME)
@@ -81,9 +83,13 @@ class RNOpentelemetryModule(reactContext: ReactApplicationContext) :
         reportFailure(promise, "Initialize: cannot construct exporter, endpoint or token missing");
         return
       }
-      exporter = OtlpHttpSpanExporter.builder()
-        .setEndpoint(beaconEndpoint)
-        .build()
+      // val apiKey = "ApiKey Z0ZLU3VKVUJNeV81cTF4cS00MnQ6SVAwRDhVYUdDT0NzRFVxMG02YjZRUQ=="
+
+        // Log.d(LogConstants.LOG_TAG, "$apiKey")
+        exporter = OtlpHttpSpanExporter.builder()
+          .setEndpoint(beaconEndpoint)
+          // .addHeader("Authorization", apiKey)
+          .build()
 
       // Create TracerProvider
       tracerProvider = SdkTracerProvider.builder()

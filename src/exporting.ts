@@ -25,6 +25,7 @@ export default class NativeSpanExporter implements SpanExporter {
 
   toNativeSpan(span: ReadableSpan): object {
     const spanContext = span.spanContext();
+
     const nSpan = {
       name: span.name,
       tracerName: span.instrumentationLibrary.name,
@@ -32,12 +33,9 @@ export default class NativeSpanExporter implements SpanExporter {
       endTime: hrTimeToMilliseconds(span.endTime),
       parentSpanId: span.parentSpanId,
       attributes: span.attributes,
-      resource: {
-        'service.name': 'my- app',
-      },
       ...spanContext,
     };
-
+    console.log('span', nSpan);
     diag.debug('Exporting:toNativeSpan: ', nSpan.name, span.attributes);
     return nSpan;
   }
