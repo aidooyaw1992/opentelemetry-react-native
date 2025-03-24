@@ -52,6 +52,14 @@ export function setNativeSessionId(id: string): Promise<boolean> {
   return RNOpentelemetry.setSessionId(id);
 }
 
+export function setNativeGlobalAttributes(
+  attributes: Attributes
+): Promise<boolean> {
+  // For some reason React Native mucks with the input argument, destroying the object values.
+  // E.g. { 'os.name': 'iOS' } gets turned into { 'os.name': [Getter/Setter] }
+  return RNOpentelemetry.setGlobalAttributes({ ...attributes });
+}
+
 export function testNativeCrash() {
   return RNOpentelemetry.nativeCrash();
 }

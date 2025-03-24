@@ -9,6 +9,7 @@ import { SCREEN_NAME } from './attributeNames';
 
 import { getSessionId } from './session';
 import { VERSION } from './version';
+import { setNativeGlobalAttributes } from './native';
 
 let globalAttributes: Attributes = {};
 
@@ -17,9 +18,9 @@ export function getResource(): ResourceAttributes {
     [SCREEN_NAME]: 'unknown',
     [ATTR_TELEMETRY_SDK_NAME]: 'otlp',
     [ATTR_TELEMETRY_SDK_VERSION]: VERSION,
-    // Splunk specific attributes
+    //specific attributes
     ' otel.rumVersion': VERSION,
-    'service.name': 'my- app',
+    'service.name': 'mymtn-app',
   };
 
   if (Platform.OS === 'ios') {
@@ -40,7 +41,9 @@ globalAttributes = {
 
 export function setGlobalAttributes(attrs: object) {
   globalAttributes = Object.assign(globalAttributes, attrs);
-  // setNativeGlobalAttributes(globalAttributes);
+  console.log('globals', globalAttributes);
+
+  setNativeGlobalAttributes(globalAttributes);
 }
 
 export function getGlobalAttributes(): Attributes {

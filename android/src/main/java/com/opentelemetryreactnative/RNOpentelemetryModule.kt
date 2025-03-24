@@ -1,6 +1,6 @@
 package com.opentelemetryreactnative
 
-import android.os.Build
+import android.app.Application
 import android.util.Log
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -10,32 +10,33 @@ import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.WritableMap
+import com.opentelemetryreactnative.crash.CrashEventAttributeExtractor
+import com.opentelemetryreactnative.crash.CrashReporter
+import com.opentelemetryreactnative.exporter.network.CurrentNetworkAttributesExtractor
+import com.opentelemetryreactnative.exporter.network.CurrentNetworkProvider
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.trace.SpanContext
 import io.opentelemetry.api.trace.SpanKind
 import io.opentelemetry.api.trace.TraceFlags
 import io.opentelemetry.api.trace.TraceState
-import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.exporter.otlp.http.trace.OtlpHttpSpanExporter
-import io.opentelemetry.sdk.resources.Resource
-import io.opentelemetry.sdk.trace.SdkTracerProvider
 import io.opentelemetry.sdk.trace.data.SpanData
 import io.opentelemetry.sdk.trace.data.StatusData
-import io.opentelemetry.sdk.trace.export.BatchSpanProcessor
 import io.opentelemetry.sdk.trace.export.SpanExporter
-import java.util.concurrent.TimeUnit
-
+import kotlin.concurrent.Volatile
 
 class RNOpentelemetryModule(reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
 
   private val moduleStartTime: Long = System.currentTimeMillis()
-  private lateinit var tracerProvider: SdkTracerProvider
+
+  @Volatile
+  private var crashReporter: CrashReporter? = null
 
   @Volatile
   private var exporter: SpanExporter? = null
 
-  private var tracer: Tracer? = null
+  private var currentNetworkProvider: CurrentNetworkProvider? = null
 
   override fun getName(): String = NAME
 
@@ -51,53 +52,23 @@ class RNOpentelemetryModule(reactContext: ReactApplicationContext) :
     try {
       val mapReader = ConfigMapReader(configMap)
       val beaconEndpoint = mapReader.getBeaconEndpoint()
-      val resourceMap = mapReader.getResource()
-      val token = mapReader.getRumAccessToken()
-
-      val resource = if (resourceMap == null) {
-        Resource.getDefault()
-      } else {
-        // Build React Native attributes
-        val resourceAttributesBuilder = Attributes.builder()
-        resourceMap.toHashMap().forEach { (key, value) ->
-          when (value) {
-            is String -> resourceAttributesBuilder.put(key, value)
-            is Number -> resourceAttributesBuilder.put(key, value.toLong())
-            is Boolean -> resourceAttributesBuilder.put(key, value)
-          }
-        }
-
-        // Add device attributes
-        resourceAttributesBuilder
-          .put("service.name", "mymtn-app")
-          .put("device.model", Build.MODEL)
-          .put("device.manufacturer", Build.MANUFACTURER)
-          .put("package.name", BuildConfig.LIBRARY_PACKAGE_NAME)
-
-        // Merge default with all attributes
-        Resource.getDefault()
-          .merge(Resource.create(resourceAttributesBuilder.build()))
-      }
 
       if (beaconEndpoint == null) {
-        reportFailure(promise, "Initialize: cannot construct exporter, endpoint or token missing");
+        reportFailure(promise, "Initialize: cannot construct exporter, endpoint missing");
         return
       }
-      // val apiKey = "ApiKey Z0ZLU3VKVUJNeV81cTF4cS00MnQ6SVAwRDhVYUdDT0NzRFVxMG02YjZRUQ=="
+      currentNetworkProvider =
+        CurrentNetworkProvider.createAndStart(reactApplicationContext.applicationContext as Application)
+      exporter = createExporter(beaconEndpoint)
 
-        // Log.d(LogConstants.LOG_TAG, "$apiKey")
-        exporter = OtlpHttpSpanExporter.builder()
-          .setEndpoint(beaconEndpoint)
-          // .addHeader("Authorization", apiKey)
-          .build()
+      crashReporter = CrashReporter(
+        exporter = exporter!!,
+        currentNetworkProvider = currentNetworkProvider!!,
+        globalAttributes = attributesFromMap(mapReader.getGlobalAttributes()),
+        context = reactApplicationContext.applicationContext
+      )
 
-      // Create TracerProvider
-      tracerProvider = SdkTracerProvider.builder()
-        .addSpanProcessor(BatchSpanProcessor.builder(exporter!!).build())
-        .addResource(resource)
-        .build()
-
-      tracer = tracerProvider.get("native-tracer")
+      crashReporter!!.install()
 
       val appStartInfo: WritableMap = Arguments.createMap()
       val appStart = PerfProvider.getAppStartTime()
@@ -108,22 +79,48 @@ class RNOpentelemetryModule(reactContext: ReactApplicationContext) :
       promise.resolve(appStartInfo)
 
     } catch (e: Exception) {
+      Log.e(LogConstants.LOG_TAG, "initializeRUM: Error", e)
       promise.reject(e)
     }
   }
 
   @ReactMethod
+  fun setGlobalAttributes(attributesMap: ReadableMap) {
+    val attributesFromMap = attributesFromMap(attributesMap)
+    setGlobalAttributes(attributesFromMap)
+  }
+
+  private fun setGlobalAttributes(attributes: Attributes) {
+    val currentCrashReporter = crashReporter
+    if (currentCrashReporter == null) {
+      Log.e(LogConstants.LOG_TAG, "setGlobalAttributes: crash reporter not initialized")
+      return
+    }
+    currentCrashReporter.updateGlobalAttributes(attributes)
+  }
+
+  @ReactMethod
   fun setSessionId(sessionId: String?) {
-//    val currentCrashReporter: CrashReporter = crashReporter
-//
-//    if (currentCrashReporter != null) {
-//      currentCrashReporter.updateSessionId(sessionId)
-//    }
+    crashReporter?.let {
+      val currentCrashReporter: CrashReporter = crashReporter!!
+      currentCrashReporter.updateSessionId(sessionId)
+      Log.d(LogConstants.LOG_TAG, "setSessionId: ")
+    }
   }
 
   @ReactMethod
   fun export(spanMaps: ReadableArray, promise: Promise) {
     try {
+      val currentExporter = exporter
+      if (currentExporter == null) {
+        reportFailure(promise, "Export: exporter not initialized")
+        return
+      }
+
+      val spanDataList = mutableListOf<SpanData>()
+      val network = currentNetworkProvider?.refreshNetworkStatus()
+      val networkAttributesExtractor = CurrentNetworkAttributesExtractor()
+      val networkAttributes = networkAttributesExtractor.extract(network!!)
 
       for (i in 0 until spanMaps.size()) {
         val spanMap = spanMaps.getMap(i)
@@ -149,27 +146,20 @@ class RNOpentelemetryModule(reactContext: ReactApplicationContext) :
         Log.d(LogConstants.LOG_TAG, "Span properties created: ${spanProperties.name}")
         val parentContext = parentContextFromMap(mapReader, context)
 
-        //create spanBuilder
-        val tracer = tracerProvider.get(spanProperties.tracerName)
-        val spanBuilder = tracer.spanBuilder(spanProperties.name)
-          .setSpanKind(spanProperties.kind)
+        val attributes =
+          attributesFromMap(mapReader.attributes).toBuilder().putAll(networkAttributes).build()
+        val spanData = ReactSpanData(
+          spanProperties,
+          attributes,
+          context,
+          parentContext,
+          emptyList()
+        )
 
-
-//          .setStartTimestamp(spanProperties.startTimeNanos, TimeUnit.MILLISECONDS)
-
-        val attributes = attributesFromMap(mapReader.attributes)
-          .toBuilder()
-          .build()
-
+        spanDataList.add(spanData)
         Log.d(LogConstants.LOG_TAG, "Created span with attributes: $attributes")
-
-        val span = spanBuilder.startSpan()
-          .setAllAttributes(attributes)
-          .setStatus(spanProperties.status.statusCode)
-
-        span.end()
       }
-
+      currentExporter.export(spanDataList)
       Log.d(LogConstants.LOG_TAG, "Export completed successfully")
       promise.resolve(null)
 
@@ -191,6 +181,13 @@ class RNOpentelemetryModule(reactContext: ReactApplicationContext) :
     }.start()
   }
 
+  private fun createExporter(endpoint: String): SpanExporter {
+    return CrashEventAttributeExtractor(
+      OtlpHttpSpanExporter.builder()
+        .setEndpoint(endpoint).build()
+    )
+  }
+
   private fun propertiesFromMap(mapReader: SpanMapReader): ReactSpanProperties? {
     val name = mapReader.name
     val startEpochMillis = mapReader.startEpochMillis
@@ -201,7 +198,6 @@ class RNOpentelemetryModule(reactContext: ReactApplicationContext) :
     }
 
     return ReactSpanProperties(
-      tracerName = tracerName,
       name = name,
       kind = SpanKind.INTERNAL,
       status = StatusData.ok(),
@@ -244,7 +240,6 @@ class RNOpentelemetryModule(reactContext: ReactApplicationContext) :
         }
       }
     }
-
     return builder.build()
   }
 
@@ -271,7 +266,6 @@ class RNOpentelemetryModule(reactContext: ReactApplicationContext) :
 
   companion object {
     const val NAME = "RNOpentelemetry"
-
 
     fun reportFailure(promise: Promise, message: String) {
       promise.reject("OTEL_ERROR", message)

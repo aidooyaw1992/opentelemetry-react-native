@@ -5,16 +5,12 @@ import { context, trace } from '@opentelemetry/api';
 
 const RumConfig: ReactNativeConfiguration = {
   beaconEndpoint: 'https://otelcol.dev.mymtnlite.com.gh/v1/traces',
-  // token: 'Z0ZLU3VKVUJNeV81cTF4cS00MnQ6SVAwRDhVYUdDT0NzRFVxMG02YjZRUQ==',
-  applicationName: 'app',
+  applicationName: 'mymtn-app',
   allowInsecureBeacon: true,
   developmentEnvironment: 'local-development',
   debug: true,
   globalAttributes: {
     'app.version': '1.1.5',
-    'globalAttr1': '42',
-    'globalAttr2': 42,
-    'service.name': 'my-app',
   },
 };
 export default function App() {

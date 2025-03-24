@@ -15,7 +15,7 @@ import {
   WebTracerProvider,
 } from '@opentelemetry/sdk-trace-web';
 import { Platform } from 'react-native';
-import { instrumentErrors } from './instrumentations/errors';
+import { instrumentErrors, reportError } from './instrumentations/errors';
 import { instrumentXHR } from './instrumentations/xhr';
 import {
   initializeNativeSdk,
@@ -25,10 +25,11 @@ import {
   type NativeSdKConfiguration,
 } from './native';
 
+import { LOCATION_LATITUDE, LOCATION_LONGITUDE } from './attributeNames';
 import NativeSpanExporter from './exporting';
-import { getResource } from './globalAttributes';
+import { getResource, setGlobalAttributes } from './globalAttributes';
+import GlobalAttributeAppender from './globalttributeAppender';
 import { _generatenewSessionId, getSessionId } from './session';
-import { Resource } from '@opentelemetry/resources';
 
 export interface ReactNativeConfiguration {
   beaconEndpoint?: string;
@@ -52,10 +53,10 @@ export interface RumType {
   init: (options: ReactNativeConfiguration) => RumType | undefined;
   provider?: WebTracerProvider;
   _testNativeCrash: () => void;
-  // updateLocation: (latitude: number, longitude: number) => void;
+  updateLocation: (latitude: number, longitude: number) => void;
 
-  // reportError: (err: any, isFatal?: boolean) => void;
-  // setGlobalAttributes: (attributes: Attributes) => void;
+  reportError: (err: any, isFatal?: boolean) => void;
+  setGlobalAttributes: (attributes: Attributes) => void;
   _generatenewSessionId: () => void;
 }
 
@@ -128,25 +129,26 @@ export const Rum: RumType = {
 
     const sessionId = getSessionId();
 
-    nativeSdkConf.resource = {
-      'service.name': config.applicationName,
-      ...getResource(),
-    };
+    nativeSdkConf.enableDiskBuffering = config.enableDiskBuffering;
 
     nativeSdkConf.globalAttributes = {
-      // ...config.globalAttributes,
-      'mtn.rumSessionId': sessionId,
+      ...getResource(),
+      ...config.globalAttributes,
+      'splunk.rumSessionId': sessionId,
+      'app': config.applicationName,
     };
 
     if (config.developmentEnvironment) {
-      nativeSdkConf.resource['deployment.environment'] =
+      nativeSdkConf.globalAttributes['deployment.environment'] =
         config.developmentEnvironment;
     }
 
     // make sure native crashreporter has correct attributes
-    // setGlobalAttributes(nativeSdkConf.globalAttributes);
-    const resource = new Resource({});
-    const provider = new WebTracerProvider({ resource });
+    setGlobalAttributes(nativeSdkConf.globalAttributes);
+
+    const provider = new WebTracerProvider({});
+
+    provider.addSpanProcessor(new GlobalAttributeAppender());
 
     provider.addSpanProcessor(
       new BatchSpanProcessor(new NativeSpanExporter(), {
@@ -154,9 +156,11 @@ export const Rum: RumType = {
         maxExportBatchSize: config.bufferSize ?? 20,
       })
     );
+
     provider.addSpanProcessor(
       new SimpleSpanProcessor(new ConsoleSpanExporter())
     );
+
     provider.register({});
 
     this.provider = provider;
@@ -171,7 +175,9 @@ export const Rum: RumType = {
     diag.debug(
       'Initializing with: ',
       config.applicationName,
-      nativeSdkConf.resource
+      nativeSdkConf.beaconEndpoint,
+      nativeSdkConf.rumAccessToken?.substring(0, 5),
+      nativeSdkConf.enableDiskBuffering
     );
 
     initializeNativeSdk(nativeSdkConf)
@@ -226,14 +232,14 @@ export const Rum: RumType = {
 
   _generatenewSessionId: _generatenewSessionId,
   _testNativeCrash: testNativeCrash,
-  // reportError: reportError,
-  // setGlobalAttributes: setGlobalAttributes,
-  // updateLocation: updateLocation,
+  reportError: reportError,
+  setGlobalAttributes: setGlobalAttributes,
+  updateLocation: updateLocation,
 };
 
-// function updateLocation(latitude: number, longitude: number) {
-//   // setGlobalAttributes({
-//   //   [LOCATION_LATITUDE]: latitude,
-//   //   [LOCATION_LONGITUDE]: longitude,
-//   // });
-// }
+function updateLocation(latitude: number, longitude: number) {
+  setGlobalAttributes({
+    [LOCATION_LATITUDE]: latitude,
+    [LOCATION_LONGITUDE]: longitude,
+  });
+}

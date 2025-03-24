@@ -9,9 +9,8 @@ function addMatchToSpan(match: RegExpMatchArray | null, span: Span): void {
   }
 }
 
-const HeaderRegex = new RegExp(
-  'traceparent;desc=[\'"]00-([0-9a-f]{32})-([0-9a-f]{16})-01[\'"]'
-);
+const HeaderRegex =
+  /traceparent;desc=['"]00-([0-9a-f]{32})-([0-9a-f]{16})-01['"]/;
 
 export function captureTraceParent(
   serverTimingValues: string,
