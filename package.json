@@ -1,6 +1,6 @@
 {
   "name": "opentelemetry-react-native",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "opentelemetry for react native",
   "source": "./src/index.tsx",
   "main": "./lib/commonjs/index.js",
